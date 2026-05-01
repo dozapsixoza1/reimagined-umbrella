@@ -4,37 +4,41 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime, timezone
 import os
-import json
 import time
 
 # ─── НАСТРОЙКИ ────────────────────────────────────────────
+# Берем токен бота из переменных окружения (это безопасно)
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("TOKEN")
-# ──────────────────────────────────────────────────────────
+if not BOT_TOKEN:
+    print("❌ Ошибка: TOKEN не установлен в переменных окружения!")
+    exit(1)
 
-# Подключаем Firebase из переменной окружения
-firebase_key_json = os.environ.get("FIREBASE_KEY")
-if not firebase_key_json:
-    raise Exception("❌ Переменная FIREBASE_KEY не найдена!")
-
-firebase_key_dict = json.loads(firebase_key_json)
-cred = credentials.Certificate(firebase_key_dict)
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+# ─── ПОДКЛЮЧЕНИЕ FIREBASE ─────────────────────────────────
+# Теперь мы подключаемся напрямую через файл, который вы загрузили
+try:
+    cred = credentials.Certificate("firebase_key.json")
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    print("✅ Firebase успешно подключен из файла!")
+except Exception as e:
+    print(f"❌ Ошибка подключения Firebase: {e}")
+    # Если файл не найден или в нем ошибка, бот выключится с пояснением
+    exit(1)
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Сбрасываем вебхук чтобы не было конфликтов
 bot.remove_webhook()
-time.sleep(2)
+time.sleep(1)
 
-
-# ─── /start и /token ──────────────────────────────────────
+# ─── КОМАНДЫ БОТА ─────────────────────────────────────────
 
 @bot.message_handler(commands=["start", "token"])
 def cmd_token(message):
     user = message.from_user
     token = secrets.token_urlsafe(24)
 
+    # Сохраняем в Firestore
     db.collection("tokens").document(token).set({
         "tgId":      str(user.id),
         "username":  (user.username or f"user{user.id}").lower(),
@@ -53,9 +57,6 @@ def cmd_token(message):
         parse_mode="HTML"
     )
 
-
-# ─── /help ────────────────────────────────────────────────
-
 @bot.message_handler(commands=["help"])
 def cmd_help(message):
     bot.send_message(
@@ -67,9 +68,6 @@ def cmd_help(message):
         parse_mode="HTML"
     )
 
-
-# ─── Всё остальное ────────────────────────────────────────
-
 @bot.message_handler(func=lambda m: True)
 def fallback(message):
     bot.send_message(
@@ -77,11 +75,10 @@ def fallback(message):
         "Напиши /token чтобы получить токен для входа 🔑"
     )
 
-
 # ─── ЗАПУСК ───────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("✅ Бот запущен!")
+    print("🚀 Бот запускается...")
     bot.infinity_polling(
         timeout=30,
         long_polling_timeout=15,
