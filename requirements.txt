@@ -1,5 +1,3 @@
+pytelegrambotapi
 flask
 flask-cors
-python-telegram-bot
-firebase-admin
-requests
