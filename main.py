@@ -3,22 +3,29 @@ import secrets
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime, timezone
+import os
+import json
 import time
 
 # ─── НАСТРОЙКИ ────────────────────────────────────────────
-BOT_TOKEN = "8741779031:AAHkDIZMLkqMvDP0urD0B88dDPQHcJjPf20"   # ← вставь токен от @BotFather
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("TOKEN")
 # ──────────────────────────────────────────────────────────
 
-# Подключаем Firebase
-cred = credentials.Certificate("serviceAccountKey.json")
+# Подключаем Firebase из переменной окружения
+firebase_key_json = os.environ.get("FIREBASE_KEY")
+if not firebase_key_json:
+    raise Exception("❌ Переменная FIREBASE_KEY не найдена!")
+
+firebase_key_dict = json.loads(firebase_key_json)
+cred = credentials.Certificate(firebase_key_dict)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Сбрасываем вебхук и ждём чтобы старый процесс умер
+# Сбрасываем вебхук чтобы не было конфликтов
 bot.remove_webhook()
-time.sleep(3)
+time.sleep(2)
 
 
 # ─── /start и /token ──────────────────────────────────────
