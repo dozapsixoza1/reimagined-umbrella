@@ -8,7 +8,7 @@ import json
 import time
 
 # ─── НАСТРОЙКИ ────────────────────────────────────────────
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("TOKEN")
+BOT_TOKEN = os.environ.get("8741779031:AAHkDIZMLkqMvDP0urD0B88dDPQHcJjPf20") or os.environ.get("TOKEN")
 # ──────────────────────────────────────────────────────────
 
 # Подключаем Firebase из переменной окружения
