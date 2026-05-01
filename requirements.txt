@@ -1,3 +1,2 @@
 pytelegrambotapi
-flask
-flask-cors
+firebase-admin
