@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import time
 
 # ─── НАСТРОЙКИ ────────────────────────────────────────────
-BOT_TOKEN = "8741779031:AAGN82KPg5Ad4SXFH40ssjleaY48_c9nGQc"   # ← вставь токен от @BotFather
+BOT_TOKEN = "8741779031:AAHkDIZMLkqMvDP0urD0B88dDPQHcJjPf20"   # ← вставь токен от @BotFather
 # ──────────────────────────────────────────────────────────
 
 # Подключаем Firebase
