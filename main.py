@@ -1,21 +1,9 @@
-"""
-TK Fame List — Telegram бот (Firestore версия)
-===============================================
-
-Установка:
-    pip install pytelegrambotapi firebase-admin
-
-Запуск:
-    python bot.py
-
-Положи serviceAccountKey.json рядом с этим файлом.
-"""
-
 import telebot
 import secrets
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime, timezone
+import time
 
 # ─── НАСТРОЙКИ ────────────────────────────────────────────
 BOT_TOKEN = "8741779031:AAGN82KPg5Ad4SXFH40ssjleaY48_c9nGQc"   # ← вставь токен от @BotFather
@@ -28,6 +16,10 @@ db = firestore.client()
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# Сбрасываем вебхук и ждём чтобы старый процесс умер
+bot.remove_webhook()
+time.sleep(3)
+
 
 # ─── /start и /token ──────────────────────────────────────
 
@@ -36,7 +28,6 @@ def cmd_token(message):
     user = message.from_user
     token = secrets.token_urlsafe(24)
 
-    # Записываем токен прямо в Firestore — сайт его найдёт
     db.collection("tokens").document(token).set({
         "tgId":      str(user.id),
         "username":  (user.username or f"user{user.id}").lower(),
@@ -83,5 +74,9 @@ def fallback(message):
 # ─── ЗАПУСК ───────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("✅ Бот запущен! Ожидаю команды...")
-    bot.infinity_polling(timeout=30, long_polling_timeout=15)
+    print("✅ Бот запущен!")
+    bot.infinity_polling(
+        timeout=30,
+        long_polling_timeout=15,
+        allowed_updates=["message"]
+    )
