@@ -1,3 +1,4 @@
+import json
 import telebot
 import secrets
 import firebase_admin
@@ -16,13 +17,17 @@ if not BOT_TOKEN:
 # ─── ПОДКЛЮЧЕНИЕ FIREBASE ─────────────────────────────────
 # Теперь мы подключаемся напрямую через файл, который вы загрузили
 try:
-    cred = credentials.Certificate("firebase_key.json")
+    firebase_json = os.environ.get("FIREBASE_KEY_JSON")
+    if not firebase_json:
+        print("❌ FIREBASE_KEY_JSON не установлен в переменных окружения!")
+        exit(1)
+    cred_dict = json.loads(firebase_json)
+    cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
     db = firestore.client()
-    print("✅ Firebase успешно подключен из файла!")
+    print("✅ Firebase успешно подключен через переменную окружения!")
 except Exception as e:
     print(f"❌ Ошибка подключения Firebase: {e}")
-    # Если файл не найден или в нем ошибка, бот выключится с пояснением
     exit(1)
 
 bot = telebot.TeleBot(BOT_TOKEN)
