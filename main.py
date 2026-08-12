@@ -8,14 +8,12 @@ import os
 import time
 
 # ─── НАСТРОЙКИ ────────────────────────────────────────────
-# Берем токен бота из переменных окружения (это безопасно)
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("TOKEN")
 if not BOT_TOKEN:
     print("❌ Ошибка: TOKEN не установлен в переменных окружения!")
     exit(1)
 
 # ─── ПОДКЛЮЧЕНИЕ FIREBASE ─────────────────────────────────
-# Теперь мы подключаемся напрямую через файл, который вы загрузили
 try:
     firebase_json = os.environ.get("FIREBASE_KEY_JSON")
     if not firebase_json:
@@ -25,14 +23,13 @@ try:
     cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
     db = firestore.client()
-    print("✅ Firebase успешно подключен через переменную окружения!")
+    print(f"✅ Firebase подключен! project_id={cred_dict.get('project_id')}", flush=True)
 except Exception as e:
-    print(f"❌ Ошибка подключения Firebase: {e}")
+    print(f"❌ Ошибка подключения Firebase: {e}", flush=True)
     exit(1)
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Сбрасываем вебхук чтобы не было конфликтов
 bot.remove_webhook()
 time.sleep(1)
 
@@ -40,17 +37,23 @@ time.sleep(1)
 
 @bot.message_handler(commands=["start", "token"])
 def cmd_token(message):
+    print("🔵 /token получен", flush=True)
     user = message.from_user
     token = secrets.token_urlsafe(24)
 
-    # Сохраняем в Firestore
-    db.collection("tokens").document(token).set({
-        "tgId":      str(user.id),
-        "username":  (user.username or f"user{user.id}").lower(),
-        "name":      user.first_name or user.username or "Пользователь",
-        "used":      False,
-        "createdAt": datetime.now(timezone.utc)
-    })
+    try:
+        db.collection("tokens").document(token).set({
+            "tgId":      str(user.id),
+            "username":  (user.username or f"user{user.id}").lower(),
+            "name":      user.first_name or user.username or "Пользователь",
+            "used":      False,
+            "createdAt": datetime.now(timezone.utc)
+        })
+        print(f"✅ Токен {token} записан в Firestore для {user.id}", flush=True)
+    except Exception as e:
+        print(f"❌ ОШИБКА ЗАПИСИ В FIRESTORE: {e}", flush=True)
+        bot.send_message(message.chat.id, "⚠️ Ошибка сервера, попробуй позже")
+        return
 
     bot.send_message(
         message.chat.id,
@@ -83,7 +86,7 @@ def fallback(message):
 # ─── ЗАПУСК ───────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("🚀 Бот запускается...")
+    print("🚀 Бот запускается...", flush=True)
     bot.infinity_polling(
         timeout=30,
         long_polling_timeout=15,
