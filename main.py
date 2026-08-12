@@ -1,8 +1,7 @@
 import json
 import telebot
-import secrets
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth
 from datetime import datetime, timezone
 import os
 import time
@@ -33,35 +32,61 @@ bot = telebot.TeleBot(BOT_TOKEN)
 bot.remove_webhook()
 time.sleep(1)
 
+# username владельца сайта — должен совпадать с SA в index.html
+SA_USERNAME = "psychokaratel"
+
+def ensure_owner_role(uid, un):
+    """Если это владелец сайта — гарантируем ему role=admin в Firestore.
+    Admin SDK обходит Security Rules, так что это безопасно делать только тут."""
+    if un != SA_USERNAME:
+        return
+    try:
+        doc_ref = db.collection("users").document(uid)
+        snap = doc_ref.get()
+        if snap.exists:
+            if snap.to_dict().get("role") != "admin":
+                doc_ref.update({"role": "admin"})
+                print(f"👑 Роль владельца восстановлена для {uid}", flush=True)
+        # если документа ещё нет — сайт создаст его сам при первом входе
+        # с role='user', и следующий /token поднимет его до admin
+    except Exception as e:
+        print(f"❌ Ошибка ensure_owner_role: {e}", flush=True)
+
 # ─── КОМАНДЫ БОТА ─────────────────────────────────────────
 
 @bot.message_handler(commands=["start", "token"])
 def cmd_token(message):
     print("🔵 /token получен", flush=True)
     user = message.from_user
-    token = secrets.token_urlsafe(24)
+
+    uid = f"tg_{user.id}"
+    un = (user.username or f"user{user.id}").lower()
+    name = user.first_name or user.username or "Пользователь"
+
+    ensure_owner_role(uid, un)
 
     try:
-        db.collection("tokens").document(token).set({
-            "tgId":      str(user.id),
-            "username":  (user.username or f"user{user.id}").lower(),
-            "name":      user.first_name or user.username or "Пользователь",
-            "used":      False,
-            "createdAt": datetime.now(timezone.utc)
+        # Реальный Firebase Auth Custom Token — подписан ключом сервисного
+        # аккаунта, его нельзя подделать. Действует 1 час.
+        custom_token = auth.create_custom_token(uid, {
+            "un": un,
+            "name": name,
+            "tgId": str(user.id),
         })
-        print(f"✅ Токен {token} записан в Firestore для {user.id}", flush=True)
+        token_str = custom_token.decode("utf-8") if isinstance(custom_token, bytes) else custom_token
+        print(f"✅ Custom token выпущен для uid={uid}", flush=True)
     except Exception as e:
-        print(f"❌ ОШИБКА ЗАПИСИ В FIRESTORE: {e}", flush=True)
+        print(f"❌ ОШИБКА ВЫПУСКА ТОКЕНА: {e}", flush=True)
         bot.send_message(message.chat.id, "⚠️ Ошибка сервера, попробуй позже")
         return
 
     bot.send_message(
         message.chat.id,
-        f"👋 Привет, <b>{user.first_name}</b>!\n\n"
-        f"🔑 Твой одноразовый токен для входа на <b>TK Fame List</b>:\n\n"
-        f"<code>{token}</code>\n\n"
+        f"👋 Привет, <b>{name}</b>!\n\n"
+        f"🔑 Твой токен для входа на <b>TK Fame List</b>:\n\n"
+        f"<code>{token_str}</code>\n\n"
         f"📋 Нажми на токен чтобы скопировать, затем вставь на сайте.\n"
-        f"⏳ Токен действует <b>10 минут</b> и сгорает после использования.",
+        f"⏳ Токен действует <b>1 час</b>.",
         parse_mode="HTML"
     )
 
@@ -91,4 +116,4 @@ if __name__ == "__main__":
         timeout=30,
         long_polling_timeout=15,
         allowed_updates=["message"]
-    )
+        )
