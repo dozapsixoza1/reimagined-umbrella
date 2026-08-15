@@ -5,6 +5,7 @@ from firebase_admin import credentials, firestore, auth
 from datetime import datetime, timezone
 import os
 import time
+import threading
 
 # ─── НАСТРОЙКИ ────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("TOKEN")
@@ -108,12 +109,40 @@ def fallback(message):
         "Напиши /token чтобы получить токен для входа 🔑"
     )
 
+# ─── PUSH-УВЕДОМЛЕНИЯ ЧЕРЕЗ САЙТ ────────────────────────────
+# Сайт пишет документы в коллекцию pushQueue: {uid, text, ts}
+# uid имеет формат "tg_<telegram_id>", так что chat_id достаём прямо из него.
+# Этот поток раз в PUSH_POLL_SECONDS проверяет очередь, шлёт сообщение и удаляет запись.
+
+PUSH_POLL_SECONDS = 12
+
+def push_worker():
+    print("📬 Push-воркер запущен", flush=True)
+    while True:
+        try:
+            docs = list(db.collection("pushQueue").limit(50).stream())
+            for doc in docs:
+                data = doc.to_dict() or {}
+                uid = data.get("uid", "")
+                text = data.get("text", "")
+                if uid.startswith("tg_") and text:
+                    try:
+                        chat_id = int(uid.replace("tg_", ""))
+                        bot.send_message(chat_id, text, parse_mode="HTML")
+                    except Exception as send_err:
+                        print(f"⚠️ Не удалось отправить push для {uid}: {send_err}", flush=True)
+                doc.reference.delete()
+        except Exception as e:
+            print(f"❌ Ошибка push_worker: {e}", flush=True)
+        time.sleep(PUSH_POLL_SECONDS)
+
 # ─── ЗАПУСК ───────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("🚀 Бот запускается...", flush=True)
+    threading.Thread(target=push_worker, daemon=True).start()
     bot.infinity_polling(
         timeout=30,
         long_polling_timeout=15,
         allowed_updates=["message"]
-        )
+    )
